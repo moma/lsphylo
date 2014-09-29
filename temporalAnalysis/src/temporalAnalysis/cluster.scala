@@ -3,10 +3,12 @@ package temporalAnalysis
 /**
  * Classe Cluster :
  * Un cluster est définit par une année, une liste de terme.
+ * 
+ * GUICHARD Alexis
  */
 class cluster(val line : Array[String])  extends Serializable with Comparable[cluster] {
   
-  var id : String = line(1)+line(0)
+  var id : String = line(1)
   var year : Int =Integer.parseInt(line(0))
   var terms:  List[String] = Nil
   var similarity: Double = 0.0

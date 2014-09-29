@@ -15,15 +15,20 @@ object temporalAnalysis {
 /**
  * Analyse temporelle entre clusters
  * Entrée : ensemble des clusters de différentes années. une ligne représente un cluster : ANNEE ID-CLUSTER [liste des termes]
+ *	 - file-input : fichier contenant les clusters
+ *   - seuil : seuil de filtrage
+ * 	 - intervalle : Considérer le calcul de similarité sur plusieurs années exemple : intervalle = 1, si aucune similarité trouvée pour 1990 alors calcul sur l'année 1991 ( intervalle = 2 recherche sur 1992 si 1991 infructueuse)
+ *	 - year-start / year-end : Année de départ et l'année de fin pour la recherche de similarité ( ex : 1990 et 2010 pour une détection de transitions sur la période 1990 à 2010)
  * Sortie : résultat des meilleures similarités pour un cluster prise en compte de l'année t+2 si aucune similarité au temps t+1. Chaque ligne peut être : 
- * 			- ID-CLUSTER+ANNEE-T	ID-CLUSTER+ANNEE-T+1 => similarité individuelle
- *    		- ID-CLUSTER+ANNEE-T	ID-CLUSTER+ANNEE-T+1	ID-CLUSTER+ANNEE-T+1 => similarité par l'union de deux clusters
- */
+ * 			- ID-CLUSTER ANNEE-T	ID-CLUSTER ANNEE-T+1 
+ * 
+ * 	GUICHARD Alexis
+ * */
 	def main(args: Array[String]) 
 	{
-		if(args.length != 2){
-			System.err.println("Usage: TemporalAnalysis <file-input> <file-output>");
-			System.exit(2);
+		if(args.length != 6){
+			System.err.println("Usage: TemporalAnalysis <file-input> <file-output> <seuil> <intervalle> <year-start> <year-end> ");
+			System.exit(6);
 		}
 		/*
 		// Connexion à la base de donéne
@@ -44,12 +49,23 @@ object temporalAnalysis {
 
 		val clusters : List[cluster] = list.map(f => new cluster(f.split(" ")));
 		val bw = new BufferedWriter(new FileWriter(new File(args(1))));
-		for(year <- 1990 to 2010){
+		for(year <- Integer.parseInt(args(4)) to Integer.parseInt(args(5))){
 			val clustersT = clusters.filter(c => c.year.equals(year)) // clusters temps T
 			for(c <- clustersT) {
-				val flag:Boolean = analysis(c,clusters.filter(clusters2 => clusters2.year.equals(year+1)), bw);
-				if(!flag)
-					analysis(c,clusters.filter(c2 => c2.year.equals(year+2)), bw);
+			  var flag:Boolean = false;
+			  var intervalle = 1;
+			  breakable{
+			    do{
+			  
+				flag  = analysis(c,clusters.filter(clusters2 => clusters2.year.equals(year+intervalle)), args(2).toDouble, bw);
+				if(flag)
+				  break;
+				intervalle= intervalle+1;
+				println(Integer.parseInt(args(3)))
+			    
+			  }while(intervalle<=Integer.parseInt(args(3)) )
+			}
+			  
 			} 
 
 		}
@@ -60,7 +76,7 @@ object temporalAnalysis {
 	/**
 	 * Détection de la meilleure similarité pour un cluster c
 	 */
-	def analysis( c:cluster, clusters:List[cluster], file:BufferedWriter) : Boolean = {
+	def analysis( c:cluster, clusters:List[cluster], seuil:Double, file:BufferedWriter) : Boolean = {
 
 			var clusterSim:List[cluster] = Nil;
 	var bestSim:cluster = null;
@@ -81,7 +97,7 @@ object temporalAnalysis {
 	if(clusterSim != null && bestSim != null && bestSim.similarity < 1.0){
 		clusterSim.sorted
 
-		var seuil:Double = bestSim.similarity
+		var s:Double = bestSim.similarity
 		for(c2 <- clusterSim){
 			breakable{
 
@@ -89,9 +105,9 @@ object temporalAnalysis {
 			var tempClusterSim: List[cluster]  = calculUnionSimilarity(c, c2, clusterSim, bestSim.similarity);
 			var tempSim: Double = clusterUnionSimilarity(c, tempClusterSim);
 
-			if(tempClusterSim.length> 0 && tempSim >= seuil ) {
+			if(tempClusterSim.length> 0 && tempSim >= s ) {
 				resultSim = tempClusterSim
-				seuil = tempSim
+				s = tempSim
 
 			}
 			}
@@ -99,17 +115,19 @@ object temporalAnalysis {
 
 	}
 	// similarité par l'union
-	if(resultSim.length > 0) {
+	if(resultSim.length > 0 && clusterUnionSimilarity(c, resultSim) >= seuil ) {
 
-		file.write(c.id+" "+resultSim.apply(0).id+" "+resultSim.apply(1).id);
+		file.write(c.id+" "+c.year+" "+resultSim.apply(0).id+" "+resultSim.apply(0).year);
+		file.newLine()
+		file.write(c.id+" "+c.year+" "+resultSim.apply(1).id+" "+resultSim.apply(1).year);
 		file.newLine()
 
 		return true
 	}
 	// Similarité individuelle trouvé
-	if(bestSim != null) {
+	if(bestSim != null && clusterSimilarity(c, bestSim) >= seuil ) {
 
-		file.write(c.id+" "+bestSim.id);
+		file.write(c.id+" "+c.year+" "+bestSim.id+" "+bestSim.year);
 		file.newLine()
 
 		return true
